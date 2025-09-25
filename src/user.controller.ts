@@ -1,16 +1,17 @@
 import { ExpressRequest } from 'express';
-import { Controller, Get, Post, Req, Request, Query, Body, Headers, Session, Ip, Param, Response } from '@nestjs/common'
+import { Controller, Get, Post, Req, Request, Query, Body, Headers, Session, Ip, Param, Response, Next, Redirect, Header } from '@nestjs/common'
+import { User } from './decorator';
 
 @Controller('/users')
 export class UserController {
     @Get('/list')
     getUserList(@Req() req: ExpressRequest, age, @Request() request: ExpressRequest): string {
         // console.log(req, request);
-        return request.url+'======='+req.method + '-----'+age
+        return request.url + '=======' + req.method + '-----' + age
     }
     @Get('/id')
     getHello2(@Query() query, @Query('id') id: string): string {
-        return 'Hello World2!  UserId:'+ query.id+ '---'+id
+        return 'Hello World2!  UserId:' + query.id + '---' + id
     }
 
     @Get('/headers')
@@ -21,7 +22,7 @@ export class UserController {
     @Get('/session')
     getSession(@Session() session, @Session('pageViews') pageViews) {
         session.pageViews = session.pageViews ? session.pageViews += 1 : 1;
-       return typeof session === 'string' ? session : JSON.stringify(session) + '---' + pageViews;
+        return typeof session === 'string' ? session : JSON.stringify(session) + '---' + pageViews;
     }
 
     @Get('/ip')
@@ -46,9 +47,11 @@ export class UserController {
         }
     }
 
+    @Header('X-Powered-By', 'NestJS') // 设置响应头
+    @Header('X-demo-name', 'hp') // 设置响应头
     @Post('/res')
     getRes(@Response() res) {
-        res.send({ code: 0, msg: 'ok', data: res.req.body})
+        res.send({ code: 0, msg: 'ok', data: res.req.body })
         // return res.send(res);
     }
 
@@ -58,4 +61,26 @@ export class UserController {
         // return res.send(res);
         return res.req.body
     }
+
+    @Post('/next')
+    next(@Response() res, @Next() next) {
+        next()
+    }
+
+    @Get('/redirect')
+    @Redirect('/users/list', 301)
+    redirect() {
+        return {
+            url: '/users/ip',
+            statusCode: 302
+        }
+    }
+
+    @Get('/customize')
+    async customize(@User() user, @User('role') role) {
+        return Promise.resolve({
+            ...user, _role: role
+        })
+    }
+
 }

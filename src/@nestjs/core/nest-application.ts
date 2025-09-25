@@ -10,6 +10,11 @@ export class NestApplication {
     constructor(protected readonly module: any) {
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
+        // 自定义添加用户信息
+        this.app.use((req, res, next) => {
+            req.user = { id: 1, name: 'admin', role: 'admin' };
+            next();
+        });
     }
     use(middleware) {
         this.app.use(middleware)
@@ -36,14 +41,28 @@ export class NestApplication {
                 // 获取方法上的path和method元数据
                 const httpMethod: string = Reflect.getMetadata('method', method);
                 const pathMetadata = Reflect.getMetadata('path', method);
+
+                // 重定向元数据
+                const redirectUrl = Reflect.getMetadata('redirectUrl', method);
+                const redirectStatusCode = Reflect.getMetadata('redirectStatusCode', method);
+
+                // 设置响应头元数据
+                const headers = Reflect.getMetadata('headers', method);
                 if (!httpMethod) continue; // 不是路由，跳过
                 // 配置路由
                 const routerPath = path.posix.join('/', prefix, pathMetadata);
-                this.app[httpMethod.toLowerCase()](routerPath, (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+                this.app[httpMethod.toLowerCase()](routerPath, async (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+                    if (headers && typeof headers === 'object') {
+                        Reflect.ownKeys(headers).forEach(key => res.setHeader(key, headers[key]))
+                    }
                     const args = this.resolveParams(controller, methodName, req, res, next);
-                    const result = method.call(controller, ...args);
+                    const result = await method.call(controller, ...args);
+                    if (redirectUrl) {
+                        res.redirect(result?.statusCode ?? redirectStatusCode ?? 302, result?.url ?? redirectUrl);
+                        return;
+                    }
                     const responseMetadata = this.getResponseMetadata(controller, methodName);
-                    if (!responseMetadata ||responseMetadata?.data?.passthrough ) {
+                    if (!responseMetadata || responseMetadata?.data?.passthrough) {
                         res.send(result);
                     }
                 });
@@ -63,6 +82,9 @@ export class NestApplication {
     private resolveParams(instance: any, methodName: string, req: ExpressRequest, res: ExpressResponse, next: NextFunction) {
         // 取出参数元数据
         const params = Reflect.getMetadata('params', instance, methodName) ?? [];
+        const ctx = {
+            switchToHttp: () => ({ getRequest: () => req, getResponse: () => res, getNext: () => next, getHeaders: () => req.headers }),
+        }
         return params.map((param) => {
             switch (param.key) {
                 case 'Request':
@@ -85,6 +107,8 @@ export class NestApplication {
                     return res;
                 case 'next':
                     return next;
+                case 'DecoratorFactory':
+                    return param.factory(param.data, ctx);
                 default:
                     return null;
             }
@@ -93,6 +117,6 @@ export class NestApplication {
 
     private getResponseMetadata(instance: any, methodName: string) {
         const list = Reflect.getMetadata('params', instance, methodName) ?? [];
-        return list.find(v => v?.key === 'Response' || v?.key === 'Res');
+        return list.find(v => v?.key === 'Response' || v?.key === 'Res' || v?.key === 'Next');
     }
 };

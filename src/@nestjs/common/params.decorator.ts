@@ -1,11 +1,15 @@
-export const createParamsDecorator = (key: string) => {
-  return (data?: any) =>(target: any, propertyKey: string, parameterIndex: number)=> {
+export const createParamsDecorator = (key: string | Function) => {
+  return (data?: any) => (target: any, propertyKey: string, parameterIndex: number) => {
     // target: UserController
     const existingParams = Reflect.getMetadata(`params`, target, propertyKey) || [];
     // existingParams.push({ parameterIndex, key });
-    existingParams[parameterIndex] = { parameterIndex, key, data };
+    if (typeof key === 'function') {
+      existingParams[parameterIndex] = { parameterIndex, key: 'DecoratorFactory', factory: key, data };
+    } else {
+      existingParams[parameterIndex] = { parameterIndex, key, data };
+    }
     // console.log('existingParams', existingParams);
-    Reflect.defineMetadata(`params`, existingParams, target, propertyKey);
+      Reflect.defineMetadata(`params`, existingParams, target, propertyKey);
   };
 };
 
@@ -26,3 +30,5 @@ export const Body = createParamsDecorator('Body');
 
 export const Response = createParamsDecorator('Response');
 export const Res = createParamsDecorator('Res');
+
+export const Next = createParamsDecorator('next');

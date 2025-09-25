@@ -23,3 +23,19 @@ export function Post(path: string = ''):MethodDecorator {
     Reflect.defineMetadata('method', 'POST', descriptor.value);
   };
 }
+
+
+export function Redirect(url: string, statusCode = 302): MethodDecorator {
+  return (target, key, descriptor) => {
+    Reflect.defineMetadata('redirectUrl',url, descriptor.value);
+    Reflect.defineMetadata('redirectStatusCode', statusCode, descriptor.value);
+  };
+}
+
+export function Header(key: string, value: any): MethodDecorator {
+  return (target, propertyKey, descriptor) => {
+    const existingHeaders = Reflect.getMetadata('headers', descriptor.value) || {};
+    existingHeaders[key] = value;
+    Reflect.defineMetadata('headers', existingHeaders, descriptor.value);
+  };
+}
